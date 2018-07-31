@@ -31,8 +31,8 @@ FunctionFitting - Some very basic networks used for learning functions
 ImageReconstruction - Training of an neural network to reconstruct MRI images using 1D operations ( aslo Day 1 challenge )
 
 # Examples missing data (work in progress):
-MaleFemaleRadiograph - Classify chest xrays as male or female
-AgeRegression - Regression for Age (Day 1 - Challenge)
-ImageSegmentation - Lung segmentation from CT data 
-ImageSynthesis - Image synthesis of brats data
+-MaleFemaleRadiograph - Classify chest xrays as male or female
+-AgeRegression - Regression for Age (Day 1 - Challenge)
+-ImageSegmentation - Lung segmentation from CT data 
+-ImageSynthesis - Image synthesis of brats data
 
