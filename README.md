@@ -5,7 +5,13 @@ All the excercises are written in Keras which is corrently integrated into tenso
 
 Keras Documentations:
     https://keras.io/
-
+    
+Bootcamp organizers:
+    Alan McMillan ( AMcmillan@uwhealth.org )  
+    Jacob Johnson( jmjohnson33@wisc.edu )
+    Kevin Johnson ( kmjohnson3@wisc.edu )
+    Tyler Bradshaw ( tbradshaw@wisc.edu)
+    
 # System Requirments
 Code has been tested on a machine with a NVIDIA K80 (11gb of GPU ram). To run this you need:
 python 3 ( https://www.python.org/ )
