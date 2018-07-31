@@ -37,9 +37,9 @@ Some of these will run on the Google research supported Colab. This is a free cl
 # Working Examples:
 - FunctionFitting - Some very basic networks used for learning functions 
 - ImageReconstruction - Training of an neural network to reconstruct MRI images using 1D operations 
+- MaleFemaleRadiograph - Classify chest xrays as male or female
 
 # Examples missing data (work in progress):
-- MaleFemaleRadiograph - Classify chest xrays as male or female
 - AgeRegression - Regression for Age 
 - ImageSegmentation - Lung segmentation from CT data 
 - ImageSynthesis - Image synthesis of brats data
