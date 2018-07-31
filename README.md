@@ -1,5 +1,5 @@
 # ML4MI_BootCamp
-Code from the ML4MI Boot Camp. 
+Code from the UW-Madison Machine Learning for Medical Imaging (ML4MI) Boot Camp. For more information about ML4MI go to: https://www.radiology.wisc.edu/research/medical-imaging-machine-learning-initiative/ 
 
 All the excercises are written in Keras which is corrently integrated into tensorflow. We use the Keras functional model which is a lot more flexible than the commonly used sequential model in examples. 
 
