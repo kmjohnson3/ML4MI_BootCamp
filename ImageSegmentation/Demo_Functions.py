@@ -59,6 +59,57 @@ def GetLCTSCdata(directory):
         mask[z_index,rr, cc] = 1
     return ims,mask
 
+def GetLungSegData():
+    # First, let's get all the subject directories. We'll do this by proceeding
+    # through the directory structure and grabbing the ones we want.
+    # We'll use the package glob to make this easy
+    import glob
+    # We know our initial directory: LCTSC. Let's add that to our current
+    # directory to get the full path
+    initial_dir = os.path.join(os.getcwd(),'LCTSC')
+    # Now we'll get all the subject directories using glob
+    subj_dirs = glob.glob(os.path.join(initial_dir,'LCTSC*'))
+    # and feed those directories into another function that loads
+    # the dicoms and masks for each
+    data = [GetLCTSCdata(d) for d in subj_dirs]
+    # get all images together as inputs
+    inputs = np.concatenate([d[0] for d in data])
+    # get all masks together as targets
+    targets = np.concatenate([d[1] for d in data])
+    # import scikit-image function
+    from skimage.transform import resize
+    # pre-allocate array
+    inputs_rs = np.zeros((inputs.shape[0],256,256))
+    # iterate over all the input images and resize
+    for i,im in enumerate(inputs):
+        inputs_rs[i] = resize(im,(256,256))
+    # repeat for target images
+    targets_rs = np.zeros((targets.shape[0],256,256))
+    for i,im in enumerate(targets):
+        targets_rs[i] = resize(im,(256,256))
+    # rename back to inputs, targets
+    inputs = inputs_rs
+    targets = targets_rs
+    # add a singleton dimension to the input and target arrays
+    inputs = inputs[...,np.newaxis]
+    targets = targets[...,np.newaxis]
+    # Get the total number of slices
+    num_slices = inputs.shape[0]
+    # Find the cutoff- set to 90% train and 10% validation
+    split_ind = np.int(.1*num_slices)
+    # split into training and validation sets using the cutoff
+    x_val = inputs[:split_ind]
+    y_val = targets[:split_ind]
+    x_train = inputs[split_ind:]
+    y_train = targets[split_ind:]
+    # finally, shuffle the order of the training data
+    # being sure to keep the inputs and targets in the 
+    # same order
+    sort_r = np.random.permutation(x_train.shape[0])
+    x_train = np.take(x_train,sort_r,axis=0)
+    y_train = np.take(y_train,sort_r,axis=0)
+    return x_train,y_train,x_val,y_val
+
 #%%
 def display_mask(im,mask,name='Mask Display'):
     msksiz = np.r_[mask.shape,4]
