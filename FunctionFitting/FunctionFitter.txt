@@ -1,0 +1,91 @@
+
+# Load a bunch of libraries
+import os
+os.environ['KERAS_BACKEND'] = 'tensorflow'
+
+#Import some libraries, some are used, some could be!
+from keras.models import Input, Model
+from keras.layers import Conv2D, Concatenate, MaxPooling2D
+from keras.layers import UpSampling2D, Dropout, BatchNormalization
+import keras
+import numpy as np
+
+'''
+Generate random data of two inputs. 
+'''
+# Simple random data (2*X1 + X2)
+x = np.random.randn(100000,1,2)
+
+# Define as function so you only have to change once in the code
+def target_function (x1,x2):
+    return(2*x1 + x2 )
+
+y = target_function (x[:,:,0],x[:,:,1])
+y = np.expand_dims(y,axis=2)
+
+print('Shape of output ' + str(y.shape))
+print('Shape of input ' + str(x.shape))
+
+# Make the two neuron network described in the powerpoint. Its two inputs, a 2 neuron hidden layer, and and one output layer
+i = Input(shape=(1,2))
+hidden_layer = keras.layers.Dense(2,activation='relu',use_bias=False)(i)
+o = keras.layers.Dense(1,activation='linear',use_bias=False)(hidden_layer)
+model = keras.Model(inputs=i, outputs=o)
+model.summary()    
+
+# Fit the  model
+model.compile(optimizer='adam',loss='mean_squared_error')
+model.fit(x,y,epochs=10, batch_size=100)
+
+# This pulls out the weights from the model
+weights = model.get_weights()
+
+#Print the layers
+print('Layer 1')
+print(weights[0])
+print('Layer 2')
+print(weights[1])
+
+# Now test with some random number
+test = np.random.randn(1,1,2)
+out = model.predict(test)
+act = target_function(test[:,:,0],test[:,:,1])
+print('A = ' + str(test[0,0,0]) + 'B = ' + str(test[0,0,1]) + ' Predict = ' + str(out[0,0,0]) + '  Actual = ' + str(act[0,0]) )
+
+
+# Plot over a wider range (on a grid this time)
+x1, x2 = np.meshgrid(np.linspace(-10,10,100),np.linspace(-10,10,100))
+x1 = np.reshape(x1,(-1,1,1))
+x2 = np.reshape(x2,(-1,1,1))
+xtest = np.concatenate((x1,x2),axis=2)
+ytest = target_function( xtest[:,:,0],xtest[:,:,1])
+ytest = np.expand_dims(ytest,2)
+
+# Do the inference ( prediction)
+ypredict = model.predict(xtest)
+
+#This imports the plotting tools. First line is to allow interactive on cloud
+import matplotlib.pyplot as plt
+
+# Plot
+plt.figure(figsize=(9,3))
+plt.subplot(131)
+plt.imshow(np.reshape(ytest,(100,100)))
+plt.colorbar()
+plt.ylabel('X1')
+plt.xlabel('X2')
+plt.title('True')
+plt.subplot(132)
+plt.imshow(np.reshape(ypredict,(100,100)))
+plt.colorbar()
+plt.ylabel('X1')
+plt.xlabel('X2')
+plt.title('Predicted')
+plt.subplot(133)
+plt.imshow(np.reshape(ypredict-ytest,(100,100)))
+plt.colorbar()
+plt.ylabel('X1')
+plt.xlabel('X2')
+plt.title('Difference')
+plt.show()
+

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# This script converts clears the output of jupyter notebooks and coonverts to python
+
+
+for NOTEBOOK in `find . -name '*.ipynb'`
+do 
+    echo $NOTEBOOK 
+    jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace $NOTEBOOK 
+    jupyter nbconvert --to=python $NOTEBOOK 
+done
+
+
+
