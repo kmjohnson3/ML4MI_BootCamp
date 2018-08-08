@@ -38,9 +38,12 @@ Some of these will run on the Google research supported Colab. This is a free cl
 - FunctionFitting - Some very basic networks used for learning functions 
 - ImageReconstruction - Training of an neural network to reconstruct MRI images using 1D operations 
 - MaleFemaleRadiograph - Classify chest xrays as male or female
+- ImageSegmentation - Lung segmentation from CT data (need to download data yourself)
 
 # Examples missing data (work in progress):
 - AgeRegression - Regression for Age 
-- ImageSegmentation - Lung segmentation from CT data 
 - ImageSynthesis - Image synthesis of brats data
+
+# Note on commits:
+If you aim to push changes to this repository, please edit the jupyter notebooks and then run clear_and_convert_bash (in linux or WSL). This will convert the notebooks to python and clear the ouput.
 

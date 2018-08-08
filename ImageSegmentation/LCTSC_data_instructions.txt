@@ -1,0 +1,26 @@
+Go to this link to download the TCIA Downloader
+Windows:
+https://wiki.cancerimagingarchive.net/download/attachments/33948883/TCIA%20Downloader-3.0.msi?version=5&modificationDate=1525981040587&api=v2
+MacOS:
+https://wiki.cancerimagingarchive.net/download/attachments/33948883/TCIA%20Downloader-3.0.dmg?version=3&modificationDate=1525980901540&api=v2
+
+Follow the instructions here to install the TCIA downloader:
+https://wiki.cancerimagingarchive.net/display/NBIA/TCIA+Current+Help+Topics#TCIACurrentHelpTopics-DownloadingTCIAImages
+
+
+Navigate to:
+https://wiki.cancerimagingarchive.net/display/Public/Lung+CT+Segmentation+Challenge+2017
+
+Click the orange "search" button.
+Browse through the pages and find the datasets that have "Train" in the name. Add as many to the cart as you like using the green + button.
+There are 36 total training subjects but we only used 10 in the Bootcamp example.
+Click the tab "Manage Data Basket".
+The LCTSC data should be listed.
+Make sure that the checkbox for "Include annotation files in the download?" is selected.
+Click "Start Download" and save the file to a convenient location.
+Open the file using the TCIA Downloader you installed.
+Browse to a directory where you wish to store the data and click "Start".
+
+The images will be downloaded to a directory named "LCTSC". This directory needs to be found by the segmentation code. The easiest way is to put in in the same location as the Python file.
+
+
