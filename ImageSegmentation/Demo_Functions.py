@@ -11,6 +11,7 @@ import numpy as np
 import pydicom
 from skimage.draw import polygon
 import matplotlib.pyplot as plt
+from tqdm.auto import tqdm
 
 def GetLCTSCdata(directory):
     cur_dir = glob.glob(os.path.join(directory, "*", ""))[0]
@@ -59,19 +60,17 @@ def GetLCTSCdata(directory):
         mask[z_index,rr, cc] = 1
     return ims,mask
 
-def GetLungSegData():
+def GetLungSegData(initial_dir):
     # First, let's get all the subject directories. We'll do this by proceeding
     # through the directory structure and grabbing the ones we want.
-    # We'll use the package glob to make this easy
-    import glob
-    # We know our initial directory: LCTSC. Let's add that to our current
-    # directory to get the full path
-    initial_dir = os.path.join(os.getcwd(),'LCTSC')
+    # We'll use the package glob for finding directories
+    # The input to this function was the LCTSC directory
+    
     # Now we'll get all the subject directories using glob
     subj_dirs = glob.glob(os.path.join(initial_dir,'LCTSC*'))
     # and feed those directories into another function that loads
     # the dicoms and masks for each
-    data = [GetLCTSCdata(d) for d in subj_dirs]
+    data = [GetLCTSCdata(d) for d in tqdm(subj_dirs,desc='Loading data:')]
     # get all images together as inputs
     inputs = np.concatenate([d[0] for d in data])
     # get all masks together as targets
