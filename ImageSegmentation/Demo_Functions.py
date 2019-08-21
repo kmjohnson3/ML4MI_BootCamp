@@ -12,20 +12,30 @@ import pydicom
 from skimage.draw import polygon
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
+from natsort import natsorted
+from skimage.transform import resize
+
+def ProcessDicomImage(dcm):
+    # convert to numpy array of floats
+    array = dcm.pixel_array.astype(np.float32)
+    # normalize to mean of 0 and std of .01
+#     array -= np.mean(array)
+#     array /= 100*np.std(array)
+    array -= np.min(array)
+    array /= np.max(array)
+    # resize to (256,256)
+    array = resize(array,(256,256),mode='constant')
+    # scale back to std of 1
+    return array
 
 def GetLCTSCdata(directory):
     cur_dir = glob.glob(os.path.join(directory, "*", ""))[0]
     dcm_dir = glob.glob(os.path.join(cur_dir, "0*", ""))[0]
     lbl_dir = glob.glob(os.path.join(cur_dir, "1*", ""))[0]
-    dicom_files = glob.glob(os.path.join(dcm_dir, "*.dcm"))
+    dicom_files = natsorted(glob.glob(os.path.join(dcm_dir, "*.dcm")))
     lbl_file = glob.glob(os.path.join(lbl_dir,"*.dcm"))[0]
     dicms = [pydicom.read_file(fn) for fn in dicom_files]
-    dicms.sort(key = lambda x: float(x.ImagePositionPatient[2]))
-    ims = np.stack([dcm.pixel_array.astype(np.float) for dcm in dicms])
-    # normalize
-    for im in ims:
-        im -= np.mean(im)
-        im /= np.std(im)
+    ims = np.stack([ProcessDicomImage(d) for d in dicms])
     # get labels
     label = pydicom.read_file(lbl_file)
     contour_names = [s.ROIName for s in label.StructureSetROISequence]
@@ -38,6 +48,7 @@ def GetLCTSCdata(directory):
     contours = contour_left + contour_right
     # Z positions
     z = [d.ImagePositionPatient[2] for d in dicms]
+    z_R = [round(elem,1) for elem in z]
     # Rows and columns
     pos_r = dicms[0].ImagePositionPatient[1]
     spacing_r = dicms[0].PixelSpacing[1]
@@ -47,17 +58,18 @@ def GetLCTSCdata(directory):
     mask = np.zeros_like(ims)
     # loop over the different slices that each contour is on
     for c in contours:
+        tempMask = np.zeros((512,512),dtype=np.float32)
         nodes = np.array(c).reshape((-1, 3))
         assert np.amax(np.abs(np.diff(nodes[:, 2]))) == 0
-        zNew = [round(elem,1) for elem in z]
         try:
             z_index = z.index(nodes[0,2])
         except ValueError:
-            z_index = zNew.index(nodes[0,2])
+            z_index = z_R.index(nodes[0,2])
         r = (nodes[:, 1] - pos_r) / spacing_r
         c = (nodes[:, 0] - pos_c) / spacing_c
         rr, cc = polygon(r, c)
-        mask[z_index,rr, cc] = 1
+        tempMask[rr,cc] = 1
+        mask[z_index] += resize(tempMask,(256,256),mode='constant')
     return ims,mask
 
 def GetLungSegData(initial_dir):
@@ -75,20 +87,6 @@ def GetLungSegData(initial_dir):
     inputs = np.concatenate([d[0] for d in data])
     # get all masks together as targets
     targets = np.concatenate([d[1] for d in data])
-    # import scikit-image function
-    from skimage.transform import resize
-    # pre-allocate array
-    inputs_rs = np.zeros((inputs.shape[0],256,256))
-    # iterate over all the input images and resize
-    for i,im in enumerate(inputs):
-        inputs_rs[i] = resize(im,(256,256))
-    # repeat for target images
-    targets_rs = np.zeros((targets.shape[0],256,256))
-    for i,im in enumerate(targets):
-        targets_rs[i] = resize(im,(256,256))
-    # rename back to inputs, targets
-    inputs = inputs_rs
-    targets = targets_rs
     # add a singleton dimension to the input and target arrays
     inputs = inputs[...,np.newaxis]
     targets = targets[...,np.newaxis]
@@ -101,12 +99,7 @@ def GetLungSegData(initial_dir):
     y_val = targets[:split_ind]
     x_train = inputs[split_ind:]
     y_train = targets[split_ind:]
-    # finally, shuffle the order of the training data
-    # being sure to keep the inputs and targets in the 
-    # same order
-    sort_r = np.random.permutation(x_train.shape[0])
-    x_train = np.take(x_train,sort_r,axis=0)
-    y_train = np.take(y_train,sort_r,axis=0)
+    tqdm.write('Data loaded')
     return x_train,y_train,x_val,y_val
 
 #%%
