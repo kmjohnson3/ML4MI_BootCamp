@@ -96,8 +96,8 @@ history = model.fit(x=X_train, y=Y_train, batch_size=15, epochs=50,
 # In[ ]:
 
 
-mse = history.history['mean_squared_error']
-val_mse = history.history['val_mean_squared_error']   #validation
+mse = history.history['mse']
+val_mse = history.history['val_mse']   #validation
 epochs = range(1,len(mse)+1)
 plt.plot(epochs,mse,'bo', label='Training mse')
 plt.plot(epochs,val_mse,'b', label='Validation mse')

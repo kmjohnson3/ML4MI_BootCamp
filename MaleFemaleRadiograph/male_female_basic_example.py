@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp_Development/blob/master/MaleFemaleRadiograph/male_female_basic_example.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-
 # ## Download data from Google Drive to colab environment
 # First we need to mount the Google Drive folder into colab. <br>
 # Then we copy the data for this exercise to the colab VM and untar it "locally".
@@ -33,15 +31,6 @@ from tensorflow.keras import optimizers
 from tensorflow.keras.models import Model 
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
-
-# There are some deprecation warnings that I want to ignore during this session (related to tensorflow version issues)
-
-# In[ ]:
-
-
-from tensorflow.python.util import deprecation
-deprecation._PRINT_DEPRECATION_WARNINGS = False
 
 
 # Define data location and image dimensions. Data is split into train (50%), validate (25%), and test (25%).
@@ -128,7 +117,7 @@ model = Model(inputs=img_input, outputs=x)
 # In[ ]:
 
 
-model.compile(loss = "binary_crossentropy", optimizer = optimizers.RMSprop(lr=1e-5), metrics=["accuracy"])
+model.compile(loss = "binary_crossentropy", optimizer = optimizers.RMSprop(learning_rate=1e-5), metrics=["accuracy"])
 
 
 # This next steps kicks off the network training. This is where we actually feed the compiled model the data (in batches).
@@ -136,7 +125,7 @@ model.compile(loss = "binary_crossentropy", optimizer = optimizers.RMSprop(lr=1e
 # In[ ]:
 
 
-history = model.fit_generator(train_generator, steps_per_epoch=130, epochs=35, 
+history = model.fit(train_generator, steps_per_epoch=130, epochs=15, 
                               validation_data=validation_generator, validation_steps=30)
 
 
@@ -151,7 +140,7 @@ test_datagen = ImageDataGenerator(rescale=1./255)
 test_generator = test_datagen.flow_from_directory(test_dir,batch_size=20, target_size=(dims,dims), class_mode='binary',color_mode='grayscale')
 
 #now evaluate the model using the generator
-[test_loss, test_acc] = model.evaluate_generator(test_generator, steps=600/20)
+[test_loss, test_acc] = model.evaluate(test_generator, steps=600/20)
 print("Test_acc: "+str(test_acc))
 
 
@@ -162,8 +151,8 @@ print("Test_acc: "+str(test_acc))
 
 from matplotlib import pyplot as plt
 import numpy as np
-acc = history.history['acc']
-val_acc = history.history['val_acc']
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
 epochs = range(1,len(acc)+1)
 plt.plot(epochs,acc,'bo', label='Training acc')
 plt.plot(epochs,val_acc,'b', label='Validation acc')
