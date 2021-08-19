@@ -1,11 +1,18 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # In[ ]:
 
 
-import os
-os.environ['KERAS_BACKEND'] = 'tensorflow'
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+# In[ ]:
+
+
+get_ipython().system('echo "Copying Data Locally (Age Regression)"')
+get_ipython().system('tar xf "/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/AgeRegressionChallenge.tar" --directory /home/')
 
 
 # In[ ]:
@@ -14,32 +21,31 @@ os.environ['KERAS_BACKEND'] = 'tensorflow'
 from matplotlib import pyplot as plt
 import numpy as np
 import h5py
-from keras import optimizers
-from keras.models import Model 
-from keras.layers import Conv2D 
-from keras.layers import MaxPooling2D
-from keras.layers import BatchNormalization
-from keras.layers import Input
-from keras.layers import Flatten
-from keras.layers import Dense
+from tensorflow.keras import optimizers
+from tensorflow.keras.models import Model 
+from tensorflow.keras.layers import Conv2D 
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
 
 
 # Load training, validation, and testing data.
 # Convert to nummpy array, add singleton dimension in channel position (1 channel -- grayscale). Edit path as needed.
-# Note that a warning may appear about expand_dims using deprecated functions -- ignore it or swap expand_dims with X_test[:,:,:, np.newaxis]
 
 # In[ ]:
 
 
-datapath = 'Data/Pneumothorax.h5'
+datapath = '/home/AgeRegressionChallenge/Data/Pneumothorax.h5'
 
 with h5py.File(datapath,'r') as f:
-    X_test = np.expand_dims( np.array(f.get('input_test')) , 3).astype(np.float32)
-    Y_test = np.expand_dims( np.array(f.get('target_test')) , 3).astype(np.float32)   
-    X_train = np.expand_dims( np.array(f.get('input_train')) , 3).astype(np.float32)  
-    Y_train = np.expand_dims( np.array(f.get('target_train')) , 3).astype(np.float32)   
-    X_val =  np.expand_dims( np.array(f.get('input_val')) , 3).astype(np.float32)   
-    Y_val = np.expand_dims( np.array(f.get('target_val')) , 3).astype(np.float32)   
+    X_test = np.array(f.get('input_test')).astype(np.float32)[:,:,:,np.newaxis]
+    Y_test = np.array(f.get('target_test')).astype(np.float32)[:,np.newaxis]   
+    X_train = np.array(f.get('input_train')).astype(np.float32)[:,:,:,np.newaxis]  
+    Y_train = np.array(f.get('target_train')).astype(np.float32)[:,np.newaxis]   
+    X_val =  np.array(f.get('input_val')).astype(np.float32)[:,:,:,np.newaxis]   
+    Y_val = np.array(f.get('target_val')).astype(np.float32)[:,np.newaxis]   
 
 
 # I'll start your network, you build the rest:
@@ -73,7 +79,7 @@ model = Model(inputs=img_input, outputs=x)
 # In[ ]:
 
 
-model.compile()
+model.compile(?)
 
 
 # Fit the model. Modify the epochs/batch_size as needed. 
@@ -113,4 +119,10 @@ plt.ylabel('Predicted age')
 plt.show()
 corr = np.corrcoef(Y_pred, Y_test)   #get correlation matrix
 print("Correlation coefficient: " + str(corr[0,1]))
+
+
+# In[ ]:
+
+
+
 

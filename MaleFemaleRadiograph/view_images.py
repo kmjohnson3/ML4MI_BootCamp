@@ -1,15 +1,28 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # In[ ]:
 
 
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+# In[ ]:
+
+
+get_ipython().system('echo "Copying Data Locally (Male/Female Radiograph)"')
+get_ipython().system('tar xf "/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/MaleFemaleRadiograph.tar" --directory /home/')
+
+
+# In[ ]:
+
+
 import os
-os.environ['KERAS_BACKEND'] = 'tensorflow'
-from keras import optimizers
-from keras.models import Model 
-from keras import layers
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras import optimizers
+from tensorflow.keras.models import Model 
+from tensorflow.keras import layers
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -17,7 +30,7 @@ from matplotlib import pyplot as plt
 # In[ ]:
 
 
-data_home_dir = 'data/'
+data_home_dir = '/home/MaleFemaleRadiograph/data/'
 train_dir = data_home_dir + 'train'
 
 
@@ -76,4 +89,10 @@ plt.imshow(pltM)
 
 
 pltM.shape
+
+
+# In[ ]:
+
+
+
 

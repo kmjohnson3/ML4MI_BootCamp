@@ -1,7 +1,5 @@
-
+#!/usr/bin/env python
 # coding: utf-8
-
-# [View in Colaboratory](https://colab.research.google.com/github/kmjohnson3/ML4MI_BootCamp/blob/master/ImageReconstruction/CoLab_AutoMap_Recon.ipynb)
 
 # This is an MRI based reconstruction demo, for 2D MRI data. The network is relatively similar to the recent AutoMap technique (https://arxiv.org/abs/1704.08841). This is a relatively 'brute force' aproach to image reconstruction in which the transoform is given no direct knowledge of the physics (although the network architecture is a bit tuned to the problem). In this work, we are assuming one direction is fully sampled (i.e. frequency encoded).
 # 
@@ -10,19 +8,22 @@
 # 
 # $s(k)=\sum_{j=1}^{N}\rho (x_j)e^{i2\pi kx}$
 # 
-# The expected reconstruction for fully sampled data is an inverse discrete Fourier transform:
+# The expected reconstruction for fully sampled data is an inverse discrete Fourier transform: 
 # 
 # $s(x)=\sum_{j=1}^{N}s(k_j)e^{i2\pi k_j x}$
 # 
 # # Questions to think about:
-# 1) What is the minimal network architecture to compute a DFT?
+# 1) What is the minimal network architecture to compute a DFT? It's a square matrix multiply.
 # 
-# 2) What is the apropriate loss function?
+# 2) What is the apropriate loss function if we wish to train an image reconstruction? 
 # 
 # 3) What is the role of the convolutional layers? When are they needed?
 # 
-# 4) What is the network learning if you train on natural images?
+# 4) What is the network learning if you train on simulated images?
 # 
+# 
+
+# # Setup
 
 # In[ ]:
 
@@ -35,10 +36,12 @@ In python you need to import libraries in order to use them.
 import tensorflow as tf
 
 # Load Keras
-import tensorflow.keras
+import tensorflow.keras as keras
 from tensorflow.keras.layers import Input, Dense, Conv1D, Flatten
 from tensorflow.keras.models import Model
-
+from tensorflow.python.util import deprecation
+deprecation._PRINT_DEPRECATION_WARNINGS = False
+  
 # Utilities
 import numpy as np
 import math 
@@ -47,34 +50,7 @@ import math
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
 
-
-# # Training Images
-# We are trainging this network using a simulation enviroment. Images are grabbed from a very common database of pictures of animals. We then simulate the image to MRI raw data conversion. Cifar100 is a set of 32x32 RGB images which is available from the Keras datasets api. We are discarding the labels.
-
-# In[ ]:
-
-
-# Download some data (using natural images)
-from keras.datasets import cifar100
-(x_train, _ ), (x_test, _) = cifar100.load_data(label_mode='fine')
-
-#Convert x_train to float32,grayscale
-x_train = x_train.astype('float32')
-x_train =1/255*( 0.299*(x_train[:,:,:,0]) + 0.587*(x_train[:,:,:,1]) +  0.114*(x_train[:,:,:,2]) )
-
-#Convert x_test to float32,grayscale 
-x_test = x_test.astype('float32')
-x_test =1/255*( 0.299*(x_test[:,:,:,0]) + 0.587*(x_test[:,:,:,1]) +  0.114*(x_test[:,:,:,2]) )
-
-# Show stats of images
-print('Dimensions of x_train are ' + str(x_train.shape) + '[ Examples x Nx x Ny x Channels]')
-print('Dimensions of x_test  are ' + str(x_test.shape) + '[ Examples x Nx x Ny x Channels]')
-
-
-# In[ ]:
-
-
-# This is a montage maker along 1st dim
+# Some support functions
 def montage( img_in, size=(3,5) ):
     for j in range(size[0]):
         plot_image = img_in[0+size[1]*j,:,:]
@@ -86,6 +62,65 @@ def montage( img_in, size=(3,5) ):
         else:
             img = np.concatenate((img,plot_image),axis=0)
     return img
+  
+def complex_to_channels( img_in):
+  return(np.stack(img_in.real,img_in.imag))
+  
+def channels_to_complex( img_in):
+  return(img_in[...,0]+1j*img_in[...,1])
+
+
+# In[ ]:
+
+
+'''
+Mount your google drive, we'll grab data from the shared folder
+'''
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+# In[ ]:
+
+
+'''
+Copy the data locally to make a bit faster
+'''
+get_ipython().system('echo "Copying Data Locally (Image Recon)"')
+get_ipython().system('rsync --progress "/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthesis.tar" /home/')
+get_ipython().system('tar xf "/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthesis.tar" --directory /home/')
+get_ipython().system('rsync --progress "/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/Example_MRI_Data.h5" /home/')
+
+
+# # Training Images
+# We are training this network using a simulation enviroment. Images are grabbed from a set of MRI brain images. This example is using the output dicoms which have been preprocessed. We then simulate the image to MRI raw data conversion. 
+
+# In[ ]:
+
+
+#Subsampling facter to reduce memory and computational burden
+subsample = 2
+
+# load training, validation, and testing data
+# adding a singleton dimension
+import h5py
+with h5py.File('/home/ImageSynthesis/data/ImageTranslationData.hdf5','r') as hf:
+    
+    # Stack the data from two contrasts
+    x_train = np.array(hf['trainX'])[:,::subsample,::subsample]
+    x_train = np.concatenate((x_train,np.array(hf['trainY'])[:,::subsample,::subsample]),axis=0)
+    
+    # Stack the data from two contrasts (validate)
+    x_val = np.array(hf['valX'])[:,::subsample,::subsample]
+    x_val = np.concatenate((x_val,np.array(hf['valX'])[:,::subsample,::subsample]),axis=0)
+
+# Input images are Dicoms which are magnitude, add 2nd channel of zeros
+x_train = np.stack((x_train,np.zeros(x_train.shape,dtype=x_train.dtype)), -1)
+x_val = np.stack((x_val,np.zeros(x_val.shape,dtype=x_train.dtype)), -1)
+
+print(f'Validate Dataset Size {x_val.shape}')
+print(f'Train Dataset Size {x_train.shape}')
+N = x_train.shape[-2]
 
 
 # # Simulate Sampling
@@ -101,97 +136,103 @@ def montage( img_in, size=(3,5) ):
 
 
 '''
-Fourier transform in 3rd dimension (Ny) followed by an FFT shift 
-'''
-kspace_train = np.fft.fftn(x_train,axes=(2,))/32
-kspace_train = np.fft.fftshift(kspace_train,axes=(2,))
-
-kspace_test = np.fft.fftn(x_test,axes=(2,))/32
-kspace_test = np.fft.fftshift(kspace_test,axes=(2,))
-
-
-# In[ ]:
-
-
-'''
 The creates a sampling mask which can be used to subsample the data.
 '''
 
 # Get the number of phase encodes
-undersample_factor = 1.0 # 1.5 for challenge
-number_phase_encodes = int(32/undersample_factor)
+undersample_factor = 1.0 
+noise_level = 0.001; 
+
+number_phase_encodes = int(N/undersample_factor)
 print('Using ' + str(number_phase_encodes) + ' phase encode')
 
 # Create a random mask to resample the data
-idx = np.full(32, False)
+idx = np.full(N, False)
 idx[:number_phase_encodes] = True
+np.random.seed(1) # Keep this one so code is reproducible
 np.random.shuffle(idx)
 sampling_mask = idx
 
-# Subsample
-kspace_train = kspace_train[:,:,sampling_mask]
-kspace_test = kspace_test[:,:,sampling_mask]
+
+'''
+Fourier transform, subsample, and add noise (Train Data)
+'''
+Nexamples = x_train.shape[0]
+kspace_train = np.zeros((Nexamples,N,number_phase_encodes,2),x_train.dtype)
+for example in range(x_train.shape[0]):
+  
+  if example % 1000 == 0:
+    print(f'Working on example {example} of {Nexamples}')
+      
+  # Grab one image
+  temp = x_train[example,:,:,0] + 1j*x_train[example,:,:,1]
+  
+  # Fourier Transform
+  kspace_temp = np.fft.fftn(temp,axes=(1,))/N
+  kspace_temp = np.fft.fftshift(kspace_temp,axes=(1,))
+  kspace_temp =np.stack( (kspace_temp.real, kspace_temp.imag), axis=-1)
+  
+  # Subsample
+  kspace_temp = kspace_temp[:,sampling_mask,:]
+  
+  # Add noise
+  kspace_temp += noise_level*np.random.randn(*kspace_temp.shape)
+
+  # Put back
+  kspace_train[example,:,:,:] = kspace_temp
+  
+print('Dimensions of training data are ' + str(kspace_train.shape) + '[ Examples x Nx x Ny x Channels]')
+
+
+'''
+Fourier transform, subsample, and add noise (Validate Data) 
+'''
+Nexamples = x_val.shape[0]
+kspace_val = np.zeros((Nexamples,N,number_phase_encodes,2),x_train.dtype)
+for example in range(x_val.shape[0]):
+  
+  if example % 1000 == 0:
+    print(f'Working on example {example} of {Nexamples}')
+      
+  # Grab one image
+  temp = x_val[example,:,:,0] + 1j*x_val[example,:,:,1]
+  
+  # Fourier Transform
+  kspace_temp = np.fft.fftn(temp,axes=(1,))/N
+  kspace_temp = np.fft.fftshift(kspace_temp,axes=(1,))
+  kspace_temp =np.stack( (kspace_temp.real, kspace_temp.imag), axis=-1)
+  
+  # Subsample
+  kspace_temp = kspace_temp[:,sampling_mask,:]
+  
+  # Add noise
+  kspace_temp += noise_level*np.random.randn(*kspace_temp.shape)
+
+  # Put back
+  kspace_val[example,:,:,:] = kspace_temp
+  
+print('Dimensions of validation data are ' + str(kspace_val.shape) + '[ Examples x Nx x Ny x Channels]')
+  
 
 
 # In[ ]:
 
 
-'''
-Add noise 
-'''
-# Note this is usually a pretty low number
-noise_level = 0.001; 
-kspace_train = kspace_train + noise_level*( np.random.randn(*kspace_train.shape) + 1J * np.random.randn(*kspace_train.shape) )
-kspace_test = kspace_test +  noise_level*( np.random.randn(*kspace_test.shape) + 1J * np.random.randn(*kspace_test.shape) )
-
-
-# In[ ]:
-
+example = 400
 
 # Show one image and k-space pair(should be whale)
-img = x_train[400,:,:];
+img = x_train[example,:,:,0] + 1j*x_train[example,:,:,1]
 
 plt.figure()
 plt.subplot(121)
-plt.imshow(img,cmap='gray')
+plt.imshow(np.abs(img),cmap='gray')
 plt.title('Grayscale')
-img = kspace_train[400,:,:];
+
+img = kspace_train[example,:,:,0] + 1j*kspace_train[example,:,:,1]
 
 plt.subplot(122)
 plt.imshow(np.abs(img),cmap='gray')
 plt.title('K-Space (1D FFT)')
-plt.show()
-
-
-# # Reshape for training
-
-# In[ ]:
-
-
-# Now lets collapse one dimension to get 1D data
-image_for_training = x_train.reshape((-1,32))
-image_for_testing = x_test.reshape((-1,32))
-
-image_for_training = np.expand_dims(image_for_training,2)
-image_for_testing = np.expand_dims(image_for_testing,2)
-
-kspace_for_training= kspace_train.reshape((-1,number_phase_encodes))
-kspace_for_testing= kspace_test.reshape((-1,number_phase_encodes))
-
-
-#Convert k-space to Real/Imag to channels 
-kspace_for_training =np.stack( (kspace_for_training.real, kspace_for_training.imag), axis=2)
-kspace_for_testing =np.stack( (kspace_for_testing.real, kspace_for_testing.imag), axis=2)
-print('Dimensions of training data are' + str(kspace_for_training.shape) + '[ Examples x Ny x Channels]')
-
-# Plot a line in k-space
-plt.figure(figsize=(10,5))
-plt.subplot(121)
-plt.plot(kspace_for_training[400,:])
-plt.title('Kspace [real/imag]')
-plt.subplot(122)
-plt.plot(image_for_training[400,:])
-plt.title('Image')
 plt.show()
 
 
@@ -200,81 +241,30 @@ plt.show()
 # In[ ]:
 
 
-# Build functional model
-inputs = Input(shape=(number_phase_encodes,2),dtype='float32')
-x = Flatten()(inputs)
-x = Dense(64,activation='linear',use_bias='False')(x)
+# Input is subsampled k-space, two channels for real/imag
+inputs = Input(shape=(N,number_phase_encodes,2), dtype='float32')
 
-use_cnn = True
-if use_cnn == False:
-    x = Dense(32, activation='linear',use_bias='False')(x)
-    predictions = keras.layers.Reshape((32, 1))(x)
-else:
-    x = Dense(32, activation='linear',use_bias='False')(x)
-    x = keras.layers.Reshape((32, 1))(x)
-    
-    convolutions_per_layer = 3
-    base_filters = 15 
-    
-    # Attach a conv encoder
-    for i in range(convolutions_per_layer):
-        x = keras.layers.Conv1D(filters=base_filters, 
-                            kernel_size=3, 
-                            padding='same',
-                            kernel_regularizer=keras.layers.regularizers.l2(0.0001),
-                            activation='relu'
-                           )(x)
-    
-    # Save this shortcut to make training a bit easier
-    shortcut = x
-        
-    x = keras.layers.MaxPool1D(pool_size=2, strides=None, padding='valid')(x)
-    for i in range(convolutions_per_layer):
-        x = keras.layers.Conv1D(filters=base_filters*2, 
-                            kernel_size=3, 
-                            padding='same',
-                            kernel_regularizer=keras.layers.regularizers.l2(0.0001),
-                            activation='relu'
-                           )(x)
-    x = keras.layers.MaxPool1D(pool_size=2, strides=None, padding='valid')(x)
-    
-    '''  Image Here is Encoded'''
-    for i in range(convolutions_per_layer):
-        x = keras.layers.Conv1D(filters=32, 
-                            kernel_size=3, 
-                            strides=1, 
-                            padding='same',
-                            kernel_regularizer=keras.layers.regularizers.l2(0.0001),
-                            activation='relu'
-                           )(x)
-    x = keras.layers.UpSampling1D(size=2)(x)
-    
-    for i in range(convolutions_per_layer):
-        x = keras.layers.Conv1D(filters=16, 
-                            kernel_size=3, 
-                            strides=1, 
-                            padding='same',
-                            kernel_regularizer=keras.layers.regularizers.l2(0.0001),
-                            activation='relu'
-                           )(x)
-        
-    x = keras.layers.UpSampling1D(size=2)(x)
-        
-    #Add a shortcut
-    x = keras.layers.Concatenate()([x, shortcut])
-    
-    predictions = keras.layers.Conv1D(filters=1, kernel_size=1, strides=1, padding='same', activation='relu')(x)
-        
-# Setup optimizer
-adam = keras.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.1, amsgrad=False,clipnorm=1)
-model = Model(inputs=inputs, outputs=predictions)
-model.compile(optimizer=adam, loss='mean_squared_error')
+# This is a bit of a trick but is two fully connected layers along the 2nd dimension. There is only a Fourier transform in 1 dimension.
+x = keras.layers.Conv2D(2*N,kernel_size=(1,number_phase_encodes),padding='valid',activation='linear', use_bias=False)(inputs)
+x = keras.layers.Permute((1,3,2))(x) 
+x = keras.layers.Conv2D(2*N,kernel_size=(1,2*N),activation='linear',padding='valid',use_bias=False)(x)
+x = keras.layers.Reshape((N,N,2))(x)
+
+# This is a pretty simple multiple convolution
+x = keras.layers.Conv2D(16,kernel_size=(3,3),activation='relu',padding='same',use_bias=True)(x)
+x = keras.layers.Conv2D(16,kernel_size=(3,3),activation='relu',padding='same',use_bias=True)(x)
+x = keras.layers.Conv2D(2,kernel_size=(3,3),activation='relu',padding='same',name='out_image',use_bias=True)(x)
+
+# Recon Network
+model = Model(inputs=inputs,outputs=x)
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=1e-3), loss='mean_squared_error')
 
 # Print a summary
 model.summary()
 
 
 # # Build a callback
+# This is a custom callback. The callback is a subclass of keras.callbacks.Callback and we replace the function calls we want to behave differently. The main objective of this callback is to allow realtime updates of the image.
 
 # In[ ]:
 
@@ -292,6 +282,8 @@ class TraingCallback(keras.callbacks.Callback):
         self.logs = []
         self.floor_epoch = 0
         self.batch_size = batch_size
+        self.loss = []
+        self.val_loss = []
     
     #def on_train_end( self, logs={}):
         # Do nothing
@@ -299,58 +291,65 @@ class TraingCallback(keras.callbacks.Callback):
     #def on_batch_begin(self, batch, logs={}): 
         # Do nothing 
         
-    def on_batch_end(self, batch, logs={}):
+    #def on_batch_end(self, batch, logs={}):
         
-        if batch%1000==0:
-            self.losses.append(logs.get('loss'))
-            
-            clear_output(wait=True)
-            self.fig = plt.figure(figsize=(10,3))
-            
-                
-            # self.params
-            #{'verbose': 1, 'nb_epoch': 12, 'batch_size': 128, 'metrics': ['loss', 'acc', 'val_loss', 'val_acc'], 'nb_sample': 60000, 'do_validation': True}
-            batch_size = self.params['batch_size']
-            
-            example = np.random.randint(10000)
-            example = 400 
-        
-            '''
-                Run a test case
-            '''        
-            # Test with above image
-            kspace1image = np.stack( (kspace_test[example,:,:].real,kspace_test[example,:,:].imag),axis=2)
-            act_image = x_test[example,:,:]
-            predicted_image = model.predict(x=kspace1image)
-            plt.subplot(132)
-            plt.imshow(np.squeeze(predicted_image), cmap='gray',vmin=0,vmax=1)
-            plt.title('Predicted Image')
-            plt.axis('off')
-            
-            plt.subplot(133)
-            plt.imshow(x_test[example,:,:,],cmap='gray',vmin=0,vmax=1)
-            plt.title('True Image')
-            plt.axis('off')
-            
-            # Using just this one image to get a loss
-            temp = np.expand_dims( x_test[example,:,:],2)
-            self.val_losses.append( model.evaluate(x=kspace1image,y=temp,verbose=False))
-            
-            '''
-            Plot the Losses 
-            '''
-            plt.subplot(131)
-            plt.semilogy(self.losses, label="Loss")
-            plt.semilogy(self.val_losses, label="Loss (test image)")
-            plt.legend()
-            
-            print('Epoch = ' + str(self.floor_epoch) + 'Loss = ' + str(logs.get('loss')) )
-            plt.show();
-            
+        #if batch%128==0:
+                     
     def on_epoch_begin(self,epoch,logs={}):
         self.floor_epoch = epoch
-            
-    #def on_epoch_end(self,epoch,logs={}):
+        
+    def on_epoch_end(self,epoch,logs={}):
+        print(logs)
+        self.floor_epoch = epoch
+        self.loss = logs['loss']
+        self.val_loss = logs['val_loss']
+        self.losses.append(logs.get('loss'))
+        self.val_losses.append(logs.get('val_loss'))
+        
+        clear_output(wait=True)
+        self.fig = plt.figure(figsize=(10,3))
+
+
+        # self.params
+        #{'verbose': 1, 'nb_epoch': 12, 'batch_size': 128, 'metrics': ['loss', 'acc', 'val_loss', 'val_acc'], 'nb_sample': 60000, 'do_validation': True}
+        #batch_size = self.params['batch_size']
+
+        example = np.random.randint(10000)
+        example = 400 
+
+        '''
+            Run a test case
+        '''        
+        # Test with above image
+        kspace1image = kspace_val[example,:,:,:]
+        kspace1image = np.expand_dims(kspace1image,0)
+        act_image = x_val[example,:,:,:]
+        predicted_image = np.squeeze(model.predict(x=kspace1image))
+
+        act_image = act_image[:,:,0] + 1j*act_image[:,:,1]
+        predicted_image = predicted_image[:,:,0] + 1j*predicted_image[:,:,1]
+
+        plt.subplot(132)
+        plt.imshow(np.abs(predicted_image), cmap='gray',vmin=0,vmax=1)
+        plt.title('Predicted Image')
+        plt.axis('off')
+
+        plt.subplot(133)
+        plt.imshow(np.abs(act_image),cmap='gray',vmin=0,vmax=1)
+        plt.title('True Image')
+        plt.axis('off')
+
+        '''
+        Plot the Losses 
+        '''
+        plt.subplot(131)
+        plt.semilogy(self.losses, label="Loss")
+        plt.semilogy(self.val_losses, label="Loss (validation)")
+        plt.legend()
+
+        print(f'Epoch = {self.floor_epoch} Loss = {self.loss}, Val Loss = {self.val_loss}')
+        plt.show();
+    
 
 
 # # Run the model fit
@@ -358,54 +357,62 @@ class TraingCallback(keras.callbacks.Callback):
 # In[ ]:
 
 
-batch_size  = 256
+# This will be limited by GPU memory for more complex networks
+batch_size  = 128
 
 # Create the callback object 
 training_callback = TraingCallback()
 
 # Run model fit
-hist = model.fit(x=kspace_for_training, # Input to NN
-                 y=image_for_training, # Expected output
+hist = model.fit(x=kspace_train, # Input to NN
+                 y=x_train, # Expected output
                  batch_size=batch_size, # Minibatch size
                  epochs=10, # Times to raster through data
                  callbacks=[training_callback],  # Run this function during training
-                 shuffle=True,
-                 verbose=False
-                );
-
-model.save("TrainedModel.h5")
-
+                 shuffle=True,# Shuffle the cases
+                 verbose=True, # Print output
+                 validation_batch_size=1,
+                 validation_data=(kspace_val,x_val) # data for validation
+                )
 
 
 # In[ ]:
 
 
-# Test with synthetic data
-kspace1image = np.stack( (kspace_test[400,:,:].real,kspace_test[400,:,:].imag),axis=2)
-act_image = x_test[400,:,:]
+example = 400
 
-print(kspace1image.shape)
-predicted_image = model.predict(x=kspace1image)
-error = model.evaluate(kspace1image,act_image.reshape(32,32,1))
-print(error)
-print(predicted_image.shape)
+# Test with synthetic data
+kspace = kspace_val[example,...]
+kspace = np.expand_dims(kspace,0)
+
+image = x_val[example,...]
+image = np.expand_dims(image,0)
+
+
+predicted_image = np.squeeze(model.predict(x=kspace))
+error = model.evaluate(kspace,image)
+
+# Convert to complex
+predicted_image = channels_to_complex(predicted_image)
+act_image = channels_to_complex(x_val[example,...])
+
 
 # Plot
 plt.figure(figsize=(11, 3), dpi=80, facecolor='w', edgecolor='k')
 plt.subplot(131)
-plt.imshow(np.squeeze(predicted_image),cmap='gray',vmin=0,vmax=1)
+plt.imshow(np.abs(predicted_image),cmap='gray',vmin=0,vmax=1)
 plt.axis('off')
 plt.colorbar()
 plt.title('Predicted')
 
 plt.subplot(132)
-plt.imshow(np.squeeze(act_image),cmap='gray',vmin=0,vmax=1)
+plt.imshow(np.abs(act_image),cmap='gray',vmin=0,vmax=1)
 plt.axis('off')
 plt.colorbar()
 plt.title('True Image')
 
 plt.subplot(133)
-plt.imshow(np.squeeze(act_image-np.squeeze(predicted_image)),cmap='gray',vmin=0)
+plt.imshow(np.abs(act_image-predicted_image),cmap='gray',vmin=0)
 plt.axis('off')
 plt.colorbar()
 plt.title('Difference Image')
@@ -434,17 +441,17 @@ def DFT_matrix(N):
     W = np.power( omega, i * j ) / N #math.sqrt(N)
     return W
 
-E = DFT_matrix(32)
+E = DFT_matrix(N)
 E = np.fft.fftshift(E,axes=(0,))
 E = E[idx,:]
 
 # Grab the data
-D = np.matrix.getH(kspace_test[400,:,:])
+D = np.matrix.getH(channels_to_complex(kspace_val[400,...]))
 
 # Solve for psuedo inverse
 Eh = np.matrix.getH(E)
 EhE = np.matmul(Eh,E)
-Ei = np.linalg.inv(EhE + 0.001*np.identity(32))
+Ei = np.linalg.inv(EhE + 0.000001*np.identity(N))
 EiEh = np.matmul(Ei,Eh)
 
 linear_algebra_prediction = np.transpose(np.matmul(EiEh,D))
@@ -452,25 +459,25 @@ linear_algebra_prediction = np.transpose(np.matmul(EiEh,D))
 plt.figure(figsize=(11, 11), dpi=80, facecolor='w', edgecolor='k')
 
 plt.subplot(231)
-plt.imshow(abs(linear_algebra_prediction),cmap='gray',vmin=0)
+plt.imshow(np.abs(linear_algebra_prediction),cmap='gray',vmin=0)
 plt.axis('off')
 plt.title('Least Squares Solution')
 plt.subplot(234)
-plt.imshow(abs(linear_algebra_prediction-act_image),cmap='gray',vmin=0,vmax=0.2)
+plt.imshow(np.abs(linear_algebra_prediction-act_image),cmap='gray',vmin=0,vmax=0.2)
 plt.axis('off')
 plt.title('Difference Least Squares')
 
 plt.subplot(232)
-plt.imshow(np.squeeze(predicted_image),cmap='gray',vmin=0,vmax=1)
+plt.imshow(np.abs(predicted_image),cmap='gray',vmin=0,vmax=1)
 plt.axis('off')
 plt.title('Neural Net Prediction')
 plt.subplot(235)
-plt.imshow(abs(np.squeeze(predicted_image)-act_image),cmap='gray',vmin=0,vmax=0.2)
+plt.imshow(np.abs(predicted_image-act_image),cmap='gray',vmin=0,vmax=0.2)
 plt.axis('off')
 plt.title('Difference Neural Net')
 
 plt.subplot(233)
-plt.imshow(act_image,cmap='gray',vmin=0,vmax=1)
+plt.imshow(np.abs(act_image),cmap='gray',vmin=0,vmax=1)
 plt.axis('off')
 plt.title('Actual Image')
 
@@ -491,58 +498,22 @@ print('Kspace Mean Squared Error LS = ' + str(np.sum(np.square(abs(diff_kspace_L
 
 
 # # Load real MRI data to test
-# This is actual acquired MRI data from a 48 channel brain scan consisting of 15 slices. The data size is exactly the same width as the cifar100 images we used for training. Just to make things doable in a short time we are keeping everything 1D, as above.  
-
-# In[ ]:
-
-
-# Authenticate User to allow download from drive
-from google.colab import auth
-auth.authenticate_user()
-
-# Build drive API
-from googleapiclient.discovery import build
-drive_service = build('drive', 'v3')
-
-
-# In[ ]:
-
-
-get_ipython().system(u'wget https://www.dropbox.com/s/1l4z7u062nvlhrz/MRI_Kspace.dat')
-
+# This is actual acquired MRI data from a brain scan consisting. The data size is larger and we crop in k-space. Just to make things doable in a short time we are keeping everything 1D, as above.  
 
 # In[ ]:
 
 
 # Load a Kspace dataset from an actual acquisition
-# From matlab size(Data) -> 256    32    48    15 
-x_mri = np.fromfile('MRI_Kspace.dat', dtype=np.complex64)
+with h5py.File('/home/Example_MRI_Data.h5','r') as hf:
+    kspace_mri = np.array(hf['Kspace'])
 
-# (note the reverse in reshape)
-x_mri = np.reshape(x_mri,(15,48,32,256))
-
-# Get the phase encode dimension into the last dimension
-x_mri = np.transpose(x_mri,(0,1,3,2))
-
-# FFT in the frequency encode dimension which is fully sampled
-x_mri = np.fft.fftshift(x_mri,axes=(2,))
-x_mri = np.roll(x_mri,shift=6,axis=2) 
-x_mri = np.fft.fftn(x_mri,axes=(2,))
-
-# Show the image
-plt.figure(figsize=(10,5))
-plt.subplot(121)
-plt.imshow(x_mri[1,1,:,:].real,aspect=1/6)
-plt.axis('off')
-plt.colorbar()
-plt.title('Real of Kspace')
-
-plt.subplot(122)
-plt.imshow(x_mri[1,1,:,:].imag,aspect=1/6)
-plt.axis('off')
-plt.colorbar()
-plt.title('Imag of Kspace')
-plt.show()
+#Crop Kspace
+crop = ( kspace_mri.shape[-2] - N ) // 2
+kspace_mri = kspace_mri[...,::subsample,crop:-crop]
+    
+print(f'Kspace size = {kspace_mri.shape} [ channels, slices, Nx, Ny], type = {kspace_mri.dtype}')
+coils = kspace_mri.shape[0]
+slices = kspace_mri.shape[1]
 
 
 # # Run a traditional reconstruction 
@@ -552,18 +523,18 @@ plt.show()
 
 
 # Traditional recon of fully sampled data
-x_mri_full = np.fft.ifftn(x_mri,axes=(3,))
+image_full = np.fft.ifftn(kspace_mri,axes=(-1,))
 
 # do sum of squares to average coils (detectors)
-x_mri_full = np.sum(abs(x_mri_full),axis=1)
-x_mri_full = np.sqrt(x_mri_full)
+image_full = np.sum(abs(image_full),axis=0)
+image_full = np.sqrt(image_full)
 
 # Make a montage (there are other options)
-plot_image = montage(x_mri_full[:,64:192,:])  
+plot_image = montage(image_full[8::2,:,:])  
     
 # Show the image
 plt.figure(figsize=(20,20))
-plt.imshow(plot_image,aspect=1/3,interpolation='bilinear',cmap='gray')
+plt.imshow(plot_image,aspect=1,interpolation='bilinear',cmap='gray')
 plt.axis('off')
 plt.title('DFT of Kspace')
 plt.show()
@@ -571,63 +542,75 @@ plt.show()
 
 # # Do inference on the real MRI data
 
+# Machine Learning Based Reconstruction
+
 # In[ ]:
 
 
-# Now lets do the inference
-real_x = x_mri.real
-imag_x = x_mri.imag
-real_x = np.reshape(real_x,(-1,32))
-imag_x = np.reshape(imag_x,(-1,32))
-x_mri_for_NN = np.stack((real_x,imag_x),axis=2)
-x_mri_for_NN = np.stack((real_x,imag_x),axis=2)
-x_mri_for_NN = x_mri_for_NN[:,sampling_mask,:]
+# Subsample kspace and convert to channels
+kspace_mri2 = kspace_mri[:,:,:,sampling_mask]
+kspace_mri2 = np.stack((kspace_mri2.real,kspace_mri2.imag),axis=-1)
+
+
+kspace_mri2 = np.reshape(kspace_mri2,(-1,N,number_phase_encodes,2))
+print(kspace_mri2.shape)
 
 # Run model
-y_mri_NN = model.predict(x=x_mri_for_NN)
+image_NN = model.predict(x=kspace_mri2)
+print(image_NN.shape)
+
 
 # Reshape
-y_mri_NN = np.reshape( y_mri_NN,(15,48,256,32))
+image_NN = np.reshape( image_NN,(coils,slices,N,N,2))
+image_NN = channels_to_complex(image_NN)
 
 # do sum of squares to average coils (detectors)
-y_mri_NN = np.sum(abs(y_mri_NN),axis=1)
-y_mri_NN = np.sqrt(y_mri_NN)
+image_NN = np.sum(abs(image_NN),axis=0)
+image_NN = np.sqrt(image_NN)
 
 # Make a montage (there are other options)
-plot_image = montage( y_mri_NN[:,64:192,:])
+plot_image = montage( image_NN[8::2,:,:])
 
 # Show the image
 plt.figure(figsize=(20,20))
-plt.imshow(plot_image,aspect=1/3,interpolation='bilinear',cmap='gray')
+plt.imshow(plot_image,aspect=1,interpolation='bilinear',cmap='gray')
 plt.axis('off')
 plt.title('Neural network prediction from Kspace')
 plt.show()
 
 
+# Linear algebra based solution
+
 # In[ ]:
 
 
-# Reshape for matrix multiple
-x_mri_for_LA = np.reshape(x_mri,(-1,32))
-x_mri_for_LA = x_mri_for_LA[:,sampling_mask]
-x_mri_for_LA = np.transpose(x_mri_for_LA)
+image_LA = np.zeros(image_full.shape,dtype=image_full.dtype)
 
+for k in range(slices):
 
-# Also do for Least squares estimate
-y_mri_LA = np.transpose(np.matmul(EiEh,x_mri_for_LA))
-y_mri_LA = np.fliplr( y_mri_LA )
-y_mri_LA = np.reshape( y_mri_LA,(15,48,256,32))
+  # Subsample kspace and convert to channels
+  kspace_mri2 = np.squeeze(kspace_mri[:,k,:,:])
+  kspace_mri2 = kspace_mri2[:,:,sampling_mask]
 
-# do sum of squares to average coils (detectors)
-y_mri_LA = np.sum(abs(y_mri_LA),axis=1)
-y_mri_LA = np.sqrt(y_mri_LA)
+  kspace_mri2 = np.reshape(kspace_mri2,(-1,number_phase_encodes))
+  kspace_mri2 = np.expand_dims(kspace_mri2,-1)
+  
+  # Also do for Least squares estimate
+  image = np.matmul(EiEh,kspace_mri2)
+  image = np.reshape(image,newshape=(coils,N,N))
+
+  # do sum of squares to average coils (detectors)
+  image = np.sum(abs(image),axis=0)
+  image = np.sqrt(image)
+
+  image_LA[k,:,:] = np.fliplr(image)
 
 # Make a montage (there are other options)
-plot_image = montage( y_mri_LA[:,64:192,:])
+plot_image = montage( image_LA[8::2,:,:])
 
 # Show the image
 plt.figure(figsize=(20,20))
-plt.imshow(plot_image,aspect=1/3,interpolation='bilinear',cmap='gray')
+plt.imshow(plot_image,aspect=1,interpolation='bilinear',cmap='gray')
 plt.axis('off')
 plt.title('Linear algebra prediction from Kspace')
 plt.show()
@@ -638,25 +621,74 @@ plt.show()
 # In[ ]:
 
 
-print('Max signal truth ' + str(np.max(abs(math.sqrt(32)*x_mri_full))))
-print('Max signal NN ' + str(np.max(abs(y_mri_NN))))
-print('Max signal LA ' + str(np.max(abs(y_mri_LA)))) 
+slice = 24
 
-diff_LA = y_mri_LA - x_mri_full*math.sqrt(32)
-diff_NN = y_mri_NN - x_mri_full*math.sqrt(32)
-print('LA Error = ' + str(np.mean(np.square(abs(diff_LA)))) )
-print('NN Error = ' + str(np.mean(np.square(abs(diff_NN)))) )
+print(image_LA.shape)
+print(image_NN.shape)
+print(image_full.shape)
 
-plt.figure(figsize=(10,3))
-plt.subplot(121)
-plt.imshow(abs(diff_LA[4,64:192,:]),aspect=(1/3),vmax=1000)
+plt.figure(figsize=(20,20))
+plt.subplot(131)
+plt.imshow(abs(image_LA[slice,:,:]),cmap='gray')
 plt.axis('off')
-plt.title('Diff Linear Algebra')
-plt.colorbar()
-plt.subplot(122)
-plt.imshow(abs(diff_NN[4,64:192,:]),aspect=(1/3),vmax=1000)
+plt.title('Linear Algebra')
+
+plt.subplot(132)
+plt.imshow(abs(image_NN[slice,:,:]),cmap='gray')
 plt.axis('off')
-plt.title('Diff Neural Net')
-plt.colorbar()
+plt.title('Neural Net')
+
+plt.subplot(133)
+plt.imshow(abs(image_full[slice,:,:]),cmap='gray')
+plt.axis('off')
+plt.title('Ground Truth')
+
 plt.show()
 
+
+# In[ ]:
+
+
+# Slice for viewing
+slice = 24
+
+# Scale to minimize difference (scaling unimportant in MRI)
+scale_LA = np.sum( image_full*np.conj(image_LA)) /np.sum(image_LA**2)
+scale_NN = np.sum( image_full*np.conj(image_NN)) /np.sum(image_NN**2)
+
+diff_LA = scale_LA*image_LA - image_full
+diff_NN = scale_NN*image_NN - image_full
+
+# Print Error
+error_LA = np.linalg.norm(diff_LA)/np.linalg.norm(image_full)
+error_NN = np.linalg.norm(diff_NN)/np.linalg.norm(image_full)
+
+print(f'Image MSE Linear Algebra = {error_LA}')
+print(f'Image MSE Neural Network = {error_NN}')
+
+plt.figure(figsize=(20,20))
+plt.subplot(131)
+plt.imshow(abs(diff_LA[slice,:,:]),cmap='gray')
+plt.axis('off')
+plt.title('Linear Algebra')
+
+plt.subplot(132)
+plt.imshow(abs(diff_NN[slice,:,:]),cmap='gray')
+plt.axis('off')
+plt.title('Neural Net')
+
+plt.subplot(133)
+plt.imshow(abs(image_full[slice,:,:]),cmap='gray')
+plt.axis('off')
+plt.title('Ground Truth')
+
+plt.show()
+
+
+# # Image Recon Challenge
+# Can you fix the image reconstruction example?  The challenge is to reconstruct the images with the following paramaters:
+# 
+# undersample_factor = 1.5 
+# noise_level = 0.001; 
+# 
+# The challenge is to minimize the error (Image MSE Neural Network) in the above code block. Send your submissions (screenshot) to kmjohnson3@wisc.edu by the deadline to be entered. It is ok to work in groups. 

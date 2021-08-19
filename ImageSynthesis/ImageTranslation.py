@@ -1,5 +1,7 @@
-
+#!/usr/bin/env python
 # coding: utf-8
+
+# <a href="https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp_Development/blob/master/ImageSynthesis/ImageTranslation.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 # # Introduction
 # This tutorial will give an example application of using deep learning for medical image-to-image translation. This example will demonstrate how to transform a segmentation CNN into a regression CNN for the purpose of predicting T2 images from T1 images. 
@@ -14,16 +16,30 @@
 
 
 import os # operating system operations 
-os.environ['KERAS_BACKEND'] = 'tensorflow'
-import numpy as np # number crunching
-np.random.seed(1) # set seed for random number generator
-import keras # our deep learning library
+
+import tensorflow as tf
 import matplotlib.pyplot as plt # for plotting our results
-# set plotting to be in-line and interactive
-get_ipython().magic(u'matplotlib notebook')
+
+import numpy as np
+np.random.seed(1) # set seed for random number generator
 
 
-# We will import other necessary modules as we go and need them
+# Next, we need to copy the files to a place where our CoLab notebook can read them.
+
+# In[ ]:
+
+
+# Mount the Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Copy data to this VM
+import tarfile
+from tqdm import tqdm
+with tarfile.open(name='/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthesis.tar') as tar:
+    for member in tqdm(iterable=tar.getmembers(), desc='Decompressing', unit='file', total=len(tar.getmembers())):
+      tar.extract(member=member,path='/home/')
+
 
 # # Data Preparation
 # All deep learning applications start with getting the data.
@@ -38,7 +54,7 @@ get_ipython().magic(u'matplotlib notebook')
 # load training, validation, and testing data
 # adding a singleton dimension
 import h5py
-with h5py.File('data/ImageTranslationData.hdf5','r') as hf:
+with h5py.File('/home/ImageSynthesis/data/ImageTranslationData.hdf5','r') as hf:
     trainX = np.array(hf.get("trainX"))[...,np.newaxis]
     trainY = np.array(hf.get("trainY"))[...,np.newaxis]
     valX = np.array(hf.get("valX"))[...,np.newaxis]
@@ -58,7 +74,7 @@ with h5py.File('data/ImageTranslationData.hdf5','r') as hf:
 # In[ ]:
 
 
-from keras.preprocessing.image import ImageDataGenerator 
+from tensorflow.keras.preprocessing.image import ImageDataGenerator 
 # setup image data generator
 datagen1 = ImageDataGenerator(
     rotation_range=10,
@@ -89,8 +105,12 @@ batchsize = 16
 
 # combine the two datagets into one that simultaneously
 # provides both input and target image
-train_generator = zip(datagen1.flow( trainX, None, batchsize, seed=seed),
-                      datagen2.flow( trainY, None, batchsize, seed=seed))
+def combine_generator(a,b):
+  while True:
+    yield(a.next(), b.next())
+    
+train_generator = combine_generator( datagen1.flow( trainX, None, batchsize, seed=seed),
+                                     datagen2.flow( trainY, None, batchsize, seed=seed))
 
 # calculate how many steps per epoch
 # If we set it to
@@ -133,9 +153,9 @@ plt.show()
 
 
 # import keras layers
-from keras.layers import Input,Conv2D,ZeroPadding2D
-from keras.layers import concatenate,Conv2DTranspose
-from keras.models import Model
+from tensorflow.keras.layers import Input,Conv2D,ZeroPadding2D
+from tensorflow.keras.layers import concatenate,Conv2DTranspose
+from tensorflow.keras.models import Model
 
 
 # Below is the code used to define the segmentation network in the previous example, including the use of skip connections. Make the appropriate alterations to this code as described above to transform it into a image-to-image translation model.
@@ -189,7 +209,7 @@ RegModel = Model(inp,out)
 # In[ ]:
 
 
-loss = keras.losses.mean_absolute_error
+loss = tf.keras.losses.mean_absolute_error
 
 
 # ##### Question 2: What are the consequences of difference loss functions for this task?
@@ -199,7 +219,7 @@ loss = keras.losses.mean_absolute_error
 # In[ ]:
 
 
-opt = keras.optimizers.Adam()
+opt = tf.keras.optimizers.Adam()
 
 RegModel.compile(loss=loss,optimizer=opt)
 
@@ -222,7 +242,7 @@ hist = RegModel.fit_generator(train_generator,steps_per_epoch=steps,epochs=5, va
 # In[ ]:
 
 
-# Get the Dice score from evaluating the model and print it out
+# Get the loss from evaluating the model and print it out
 score = RegModel.evaluate(testX, testY, verbose=0)
 print('Final loss on test set: {:.03e}'.format(score))
 
@@ -303,13 +323,13 @@ ax.text(0.75, -.05, 'Actual T2',
 plt.show()
 
 
-# Results will vary here. It's unlikely to be perfect. However, you can probably notice some of the contrast patterns are starting to align with the target image, and likely there are a few concentrated areas of error in the difference image.
+# Results will vary here. It's unlikely to be perfect. However, you can probably notice some of the contrast patterns are starting to align with the target image, and likely there are a few concentrated areas of error in the difference image. You could definitely train this model longer and get better results!
 
 # ##### Question 3: What do you notice about the input and target images? Look closely, and compare to the output image
 
 # ## Future Directions
 # 
-# In the last year or so, a specialized type of deep learning model known as GANs have taken over image-to-image translation problems. GAN stands for Generative Adversarial Network. There are lots of resources online, but we'll provide a quick breakdown of them here in the context of medical imaging.
+# In the last few years, a specialized type of deep learning model known as GANs have taken over image-to-image translation problems. GAN stands for Generative Adversarial Network. There are lots of resources online, but we'll provide a quick breakdown of them here in the context of medical imaging.
 # 
 #   - Generative: The model contains a "generator" that is responsible for turning the input image into the target image. The network we used for this example would serve as the generator.
 #   - Adversarial: There is a second part of the model known as a "discriminator". The job of this discriminator is to determine whether an image that it is given is real or "fake": produced by the generator. It takes the form of a classification network that classifies the test image as real or fake. The score of the discriminator is used as the loss of the generator. Thus, these networks battle against each other in an adversarial way.
