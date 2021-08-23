@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp_Development/blob/master/ImageSynthesis/ImageTranslation.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-
 # # Introduction
 # This tutorial will give an example application of using deep learning for medical image-to-image translation. This example will demonstrate how to transform a segmentation CNN into a regression CNN for the purpose of predicting T2 images from T1 images. 
 # 
@@ -21,10 +19,13 @@ import tensorflow as tf
 import matplotlib.pyplot as plt # for plotting our results
 
 import numpy as np
-np.random.seed(1) # set seed for random number generator
+
+# initialize random seeds for more reproducible results
+np.random.seed(1)
+tf.random.set_seed(1)
 
 
-# Next, we need to copy the files to a place where our CoLab notebook can read them.
+# Next, we need to copy the files to a place where our CoLab notebook can read them. This file is pretty big so it may take a few minutes to complete.
 
 # In[ ]:
 
@@ -34,11 +35,7 @@ from google.colab import drive
 drive.mount('/content/drive')
 
 # Copy data to this VM
-import tarfile
-from tqdm import tqdm
-with tarfile.open(name='/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthesis.tar') as tar:
-    for member in tqdm(iterable=tar.getmembers(), desc='Decompressing', unit='file', total=len(tar.getmembers())):
-      tar.extract(member=member,path='/home/')
+get_ipython().system("cp /content/drive/'My Drive'/ML4MI_BOOTCAMP_DATA/ImageTranslationData.hdf5 .")
 
 
 # # Data Preparation
@@ -46,7 +43,7 @@ with tarfile.open(name='/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthes
 # 
 # We made this one easy for you by compiling the data into an HDF5 file. We will be using MRI T1 images of the brain as inputs, and we wish to convert them to T2 images. All we have to do is load all of the inputs and targets and it will be ready to go.
 # 
-# First we import the python hdf5 library, h5py. Then we load all the individual datasets in and convert them to Numpy arrays. This will take a few seconds.
+# First we import the python hdf5 library, h5py. Then we load all the individual datasets in and convert them to Numpy arrays. This will take a while to process.
 
 # In[ ]:
 
@@ -54,7 +51,7 @@ with tarfile.open(name='/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageSynthes
 # load training, validation, and testing data
 # adding a singleton dimension
 import h5py
-with h5py.File('/home/ImageSynthesis/data/ImageTranslationData.hdf5','r') as hf:
+with h5py.File('ImageTranslationData.hdf5','r') as hf:
     trainX = np.array(hf.get("trainX"))[...,np.newaxis]
     trainY = np.array(hf.get("trainY"))[...,np.newaxis]
     valX = np.array(hf.get("valX"))[...,np.newaxis]
@@ -63,7 +60,7 @@ with h5py.File('/home/ImageSynthesis/data/ImageTranslationData.hdf5','r') as hf:
     testY = np.array(hf.get("testY"))[...,np.newaxis]
 
 
-# ##### Question 1: What is the purpose of the training, validation, and testing datasets?
+# ##### **Question 1**: What is the purpose of the training, validation, and testing datasets?
 
 # This time, we will use an ImageDataGenerator so we can augment data on the fly. Before, we used this on a directory to make loading in image data from directories a breeze. However, that only works for classification schemes. For this image to image translation problem, we first had to load all the data into an array. Already did it!
 # 
@@ -147,7 +144,7 @@ plt.show()
 # 
 # Let's get to work!
 
-# We have already imported keras, so we don't technically need to import anything. It keep code a lot cleaner to individually import layers, so we'll do that again.
+# We have already imported Keras, so we don't technically need to import anything. It keep code a lot cleaner to individually import layers that we use, so we'll do that again.
 
 # In[ ]:
 
@@ -164,47 +161,42 @@ from tensorflow.keras.models import Model
 
 
 inp = Input(shape=trainX.shape[1:])
-init = 'he_normal'
-x = Conv2D(10,kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(inp)
-x1 = Conv2D(20, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
+x = Conv2D(10,kernel_size=(3,3),padding='same',activation='relu')(inp)
+x1 = Conv2D(20, kernel_size=(3,3),padding='same',activation='relu')(x)
 zp = ZeroPadding2D(padding=(1,1))(x1)
 x = Conv2D(30, kernel_size=(4,4),
                 strides=(2,2),
-                activation='relu',
-                kernel_initializer=init)(zp)
-x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
-x2 = Conv2D(40, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
+                activation='relu')(zp)
+x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu')(x)
+x2 = Conv2D(40, kernel_size=(3,3),padding='same',activation='relu')(x)
 zp = ZeroPadding2D(padding=(1,1))(x2)
 x = Conv2D(40, kernel_size=(4,4),
                 strides=(2,2),
-                activation='relu',
-                kernel_initializer=init)(zp)
-x = Conv2D(50, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
-x = Conv2D(50, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
+                activation='relu')(zp)
+x = Conv2D(50, kernel_size=(3,3),padding='same',activation='relu')(x)
+x = Conv2D(50, kernel_size=(3,3),padding='same',activation='relu')(x)
 x = Conv2DTranspose(40, kernel_size=(4,4),
                         strides=(2,2),
-                        activation='relu',
-                        kernel_initializer=init)(x)
-x = Conv2D(40, kernel_size=(3,3),activation='relu',kernel_initializer=init)(x)
+                        activation='relu')(x)
+x = Conv2D(40, kernel_size=(3,3),activation='relu')(x)
 x = concatenate([x,x2])
-x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
-x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
+x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu')(x)
+x = Conv2D(30, kernel_size=(3,3),padding='same',activation='relu')(x)
 x = Conv2DTranspose(20, kernel_size=(4,4),
                         strides=(2,2),
-                        activation='relu',
-                        kernel_initializer=init)(x)
-x = Conv2D(20, kernel_size=(3,3),activation='relu',kernel_initializer=init)(x)
+                        activation='relu')(x)
+x = Conv2D(20, kernel_size=(3,3),activation='relu')(x)
 x = concatenate([x,x1])
-x = Conv2D(10, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
-x = Conv2D(10, kernel_size=(3,3),padding='same',activation='relu',kernel_initializer=init)(x)
+x = Conv2D(10, kernel_size=(3,3),padding='same',activation='relu')(x)
+x = Conv2D(10, kernel_size=(3,3),padding='same',activation='relu')(x)
 
 # Final output layer
-out = Conv2D(1,kernel_size=(1,1),activation='linear',kernel_initializer=init)(x)
+out = Conv2D(1,kernel_size=(1,1),activation='linear')(x)
 
-RegModel = Model(inp,out)
+TranslationModel = Model(inp,out)
 
 
-# Next, define the loss function you wish to use for this problem
+# Next, define the loss function you wish to use for this problem. Here we will use the mean absolute error, which is commonly used in image synthesis applications.
 
 # In[ ]:
 
@@ -212,16 +204,15 @@ RegModel = Model(inp,out)
 loss = tf.keras.losses.mean_absolute_error
 
 
-# ##### Question 2: What are the consequences of difference loss functions for this task?
+# ##### **Question 2**: What are the consequences of difference loss functions for this task?
 
 # Finally, add an optimizer and compile the model
 
 # In[ ]:
 
 
-opt = tf.keras.optimizers.Adam()
-
-RegModel.compile(loss=loss,optimizer=opt)
+opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+TranslationModel.compile(loss=loss,optimizer=opt)
 
 
 # Now all you have to do is call your compiled model on this data generator. Here's the syntax:
@@ -233,7 +224,7 @@ RegModel.compile(loss=loss,optimizer=opt)
 # In[ ]:
 
 
-hist = RegModel.fit_generator(train_generator,steps_per_epoch=steps,epochs=5, validation_data=(valX,valY))
+hist = TranslationModel.fit(train_generator,steps_per_epoch=steps,epochs=5, validation_data=(valX,valY))
 
 
 # ### Evaluate Model
@@ -243,11 +234,11 @@ hist = RegModel.fit_generator(train_generator,steps_per_epoch=steps,epochs=5, va
 
 
 # Get the loss from evaluating the model and print it out
-score = RegModel.evaluate(testX, testY, verbose=0)
+score = TranslationModel.evaluate(testX, testY, verbose=0)
 print('Final loss on test set: {:.03e}'.format(score))
 
 
-# Plot the loss curves too:
+# Let's plot the loss curves too:
 
 # In[ ]:
 
@@ -264,13 +255,13 @@ plt.ylim([0,np.max(hist.history['loss'])])
 plt.show()
 
 
-# Another useful way to evaluate a model is to just look at the outputs. We can look at a sample image to see how the images look compared to the ground truth.
+# Of course another useful way to evaluate a model is to just look at the outputs. We can look at a sample image to see how the images look compared to the ground truth.
 
 # In[ ]:
 
 
 # Get the predictions of the model on the test inputs
-predictions = RegModel.predict(testX)
+predictions = TranslationModel.predict(testX)
 
 
 # We'll display the input image, output image, ground truth image, and the difference image in a 2x2 grid. We'll add labels just to make it easier to know what we are looking at.
@@ -323,9 +314,9 @@ ax.text(0.75, -.05, 'Actual T2',
 plt.show()
 
 
-# Results will vary here. It's unlikely to be perfect. However, you can probably notice some of the contrast patterns are starting to align with the target image, and likely there are a few concentrated areas of error in the difference image. You could definitely train this model longer and get better results!
+# Results may vary here. It's unlikely to be perfect. However, you can probably notice some of the contrast patterns are starting to align with the target image, and likely there are a few concentrated areas of error in the difference image. You could definitely train this model longer and get better results!
 
-# ##### Question 3: What do you notice about the input and target images? Look closely, and compare to the output image
+# ##### **Question 3**: What do you notice about the input and target images? Look closely, and compare to the output image
 
 # ## Future Directions
 # 

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# <a href="https://colab.research.google.com/github/kmjohnson3/ML4MI_BootCamp/blob/master/ImageModalityDetector/MRI_Modality_Detection.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-
 # # Introduction
 # This tutorial will give an example application of using deep learning for categorization of images. This example will demonstrate how to implement a convolutional neural network for the identifying the type of MRI contrast or pulse sequence from a given input. The tutorial will have 3 main parts:
 # 
@@ -24,11 +22,9 @@ import os
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-# initialize random seeds for reproducible results
-from numpy.random import seed
-seed(1)
-from tensorflow import set_random_seed
-set_random_seed(2)
+# initialize random seeds for more reproducible results
+numpy.random.seed(1)
+tf.random.set_seed(1)
 
 
 # Next, we need to copy the files to a place where our CoLab notebook can read them.
@@ -112,7 +108,7 @@ model = ?
 #    Here is a list of available loss functions in Keras: https://keras.io/losses/
 #  What metrics should be used? accuracy is also not appropriate here.
 #    Here is a list of available metrics in Keras: https://keras.io/metrics/
-model.compile(loss="?", optimizer=tf.keras.optimizers.Adam(lr=1e-3), metrics=["?"])
+model.compile(loss="?", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["?"])
 
 
 # # Model Training
@@ -124,7 +120,7 @@ model.compile(loss="?", optimizer=tf.keras.optimizers.Adam(lr=1e-3), metrics=["?
 
 
 # the call to flow_from_directory, technically it returns a DirectoryIterator object
-#  that we pass to the model.fit_generator. Let's set it up:
+#  that we pass to the model.fit. Let's set it up:
 # What should class_mode be set to here?
 train_generator = train_datagen.flow_from_directory(train_folder, batch_size=batch_size, target_size=(dims,dims), shuffle=True, class_mode='?', color_mode='grayscale')
 valid_generator = valid_datagen.flow_from_directory(valid_folder, batch_size=batch_size, target_size=(dims,dims), shuffle=True, class_mode='?', color_mode='grayscale')
@@ -149,7 +145,7 @@ steps = 500
 val_steps = 100
 
 # now let's train for 5 epochs (note that this is unrealistic demonstration of model training)
-history = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=5, 
+history = model.fit(train_generator, steps_per_epoch=steps, epochs=5, 
                               validation_data=valid_generator, validation_steps=val_steps)
 
 # It should take approximately 5 minutes to train. Maybe you should take a break
@@ -196,9 +192,9 @@ plt.show()
 model_mn = tf.keras.applications.mobilenet.MobileNet( ? )
 
 # now let's train it
-model_mn.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(lr=1e-3), metrics=["categorical_accuracy"])
-history_mn = model_mn.fit_generator(train_generator, steps_per_epoch=steps, epochs=5,
-                              validation_data=valid_generator, validation_steps=val_steps)
+model_mn.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3), metrics=["categorical_accuracy"])
+history_mn = model_mn.fit(train_generator, steps_per_epoch=steps, epochs=5,
+                          validation_data=valid_generator, validation_steps=val_steps)
 
 # this model will take several minutes to train (a bit longer than the first one)
 
@@ -246,10 +242,10 @@ plt.show()
 # </pre>
 # #### Used to train all of the above models
 # <pre>
-# model.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(lr=1e-4), metrics=["categorical_accuracy"])
+# model.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
 # from keras.callbacks import ModelCheckpoint
 # model_checkpoint = ModelCheckpoint('weights.h5', monitor='loss', save_best_only=True)
-# history = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=30, callbacks=[model_checkpoint], validation_data=valid_generator, validation_steps=val_steps )
+# history = model.fit(train_generator, steps_per_epoch=steps, epochs=30, callbacks=[model_checkpoint], validation_data=valid_generator, validation_steps=val_steps )
 # </pre>
 # 
 # 
@@ -299,7 +295,7 @@ plt.show()
 
 
 model_i = tf.keras.applications.inception_v3.InceptionV3(weights='/home/ImageModalityDetector/weights_inceptionv3.h5', input_shape=(dims,dims,1), classes=classes)
-model_i.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(lr=1e-4), metrics=["categorical_accuracy"])
+model_i.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
 
 
 # Now let's work on testing the model with some data
