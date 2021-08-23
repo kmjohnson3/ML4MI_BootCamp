@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # # Introduction
@@ -16,31 +16,40 @@
 # In[ ]:
 
 
-# This is not generally needed. Needed on Jupyter to explicitly set TensorFlow as backend
-import os
-os.environ['KERAS_BACKEND'] = 'tensorflow'
-
 import numpy
-from keras.models import Model
-from keras import layers
-from keras import optimizers
-from keras.preprocessing.image import ImageDataGenerator
+import os
 
-# initialize random seeds for reproducible results
-from numpy.random import seed
-seed(1)
-from tensorflow import set_random_seed
-set_random_seed(2)
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+# initialize random seeds for more reproducible results
+numpy.random.seed(1)
+tf.random.set_seed(1)
 
 
-# We will import other necessary modules as we go and need them.
+# Next, we need to copy the files to a place where our CoLab notebook can read them.
+
+# In[ ]:
+
+
+# Mount the Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Unarchive data to this VM
+import tarfile
+from tqdm import tqdm
+with tarfile.open(name='/content/drive/My Drive/ML4MI_BOOTCAMP_DATA/ImageModalityDetector.tar') as tar:
+    for member in tqdm(iterable=tar.getmembers(), desc='Decompressing', unit='file', total=len(tar.getmembers())):
+      tar.extract(member=member,path='/home/')
+
 
 # # Part 1: Data Organization
 # Data for this example has already been prepared for you. The data utilized here is from the 2017 MICCAI Multimodal Brain Tumor Segmentation (BRATS) Challenge. The data consists of magnetic resonance imaging (MRI) data from 19 different institutions in subjects with glioblastoma/high grade glioma (GBM/HGG) and low grade glioma (LGG). The different MRI scans include: T1-weighted (t1), post-contrast Gadolinium-enhanced images (t1ce), T2-weighted (t2), and T2 fluid attenuated inversion recovery (flair). More information on the 2017 BRATS Challenge is available here: https://www.med.upenn.edu/sbia/brats2017/data.html
 # 
 # Data preparation for this example is similar to the approach that utilized in the previous example. This includes the use of a Keras image data generator. Your instructor has converted the BRATS data from the NiFTI imaging format (https://nifti.nimh.nih.gov/nifti-1/) to portable network graphics (.png) files, which is an image file format that can be read natively in Keras. Each .png file is a 256x256 axial image. In a later exercise, you will load image data directly from DICOM files as a further example. The structure of the data folder is as follows:
 # <pre>
-#   --brats_contrast_detector
+#   --ImageModalityDetector
 #      --test (17,100 files)
 #            --flair
 #            --t1
@@ -74,12 +83,12 @@ classes = 4
 batch_size = 15 # this is how many input images will be utilized for each training step
 
 # this is the folder that contains the 39,900 images that will be used for training
-train_folder = os.path.join(os.getcwd(),'train')
+train_folder = '/home/ImageModalityDetector/train'
 # this is the folder htat contains the 17,100 images that will be used for validation
-valid_folder = os.path.join(os.getcwd(),'validate')
+valid_folder = '/home/ImageModalityDetector/validate'
 
 # set up the ImageDataGenerator for the validation data first. We will not perform augmentation on the validation data, but we do need to normalize the input intensity of the input images:
-valid_datagen = ImageDataGenerator(rescale=1./255)
+valid_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
 
 # now set up the ImageDataGenerator for the training:
 # Go to the documentation page for the ImageDataGenerator (https://keras.io/preprocessing/image/#imagedatagenerator-class)
@@ -87,7 +96,7 @@ valid_datagen = ImageDataGenerator(rescale=1./255)
 #  What are reasonable values for this type of dataset?
 #train_datagen = ?
 #<SOLUTION>
-train_datagen = ImageDataGenerator(rescale=1./255,rotation_range=10,shear_range=1,width_shift_range=0.2,height_shift_range=0.2,zoom_range=0.2)
+train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255,rotation_range=10,shear_range=1,width_shift_range=0.2,height_shift_range=0.2,zoom_range=0.2)
 #</SOLUTION>
 
 
@@ -99,14 +108,14 @@ train_datagen = ImageDataGenerator(rescale=1./255,rotation_range=10,shear_range=
 
 # insert the model you used in the last example here
 #<SOLUTION>
-img_input = layers.Input(shape=(dims,dims,1))
-x = layers.Conv2D(15, (3, 3), strides=(4,4), padding='same', kernel_initializer='he_normal')(img_input)
-x = layers.Activation('relu')(x)
-x = layers.MaxPooling2D((2, 2), strides=None)(x)
-x = layers.Flatten()(x)     #reshape to 1xN
-x = layers.Dense(20, activation='relu', kernel_initializer='he_normal')(x)
-x = layers.Dense(classes, activation='relu')(x)
-model = Model(inputs=img_input, outputs=x)
+img_input = tf.keras.layers.Input(shape=(dims,dims,1))
+x = tf.keras.layers.Conv2D(15, (3, 3), strides=(4,4), padding='same', kernel_initializer='he_normal')(img_input)
+x = tf.keras.layers.Activation('relu')(x)
+x = tf.keras.layers.MaxPooling2D((2, 2), strides=None)(x)
+x = tf.keras.layers.Flatten()(x)     #reshape to 1xN
+x = tf.keras.layers.Dense(20, activation='relu', kernel_initializer='he_normal')(x)
+x = tf.keras.layers.Dense(classes, activation='softmax')(x)
+model = tf.keras.models.Model(inputs=img_input, outputs=x)
 #</SOLUTION>
 
 # now lets compile the model.
@@ -114,9 +123,9 @@ model = Model(inputs=img_input, outputs=x)
 #    Here is a list of available loss functions in Keras: https://keras.io/losses/
 #  What metrics should be used? accuracy is also not appropriate here.
 #    Here is a list of available metrics in Keras: https://keras.io/metrics/
-#model.compile(loss="?", optimizer=optimizers.Adam(lr=1e-3), metrics=["?"])
+#model.compile(loss="?", optimizer=tf.keras.optimizers.optimizers.Adam(learning_rate=1e-4), metrics=["?"])
 #<SOLUTION>
-model.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e-5), metrics=["categorical_accuracy"])
+model.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
 #</SOLUTION>
 
 
@@ -129,7 +138,7 @@ model.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e-5
 
 
 # the call to flow_from_directory, technically it returns a DirectoryIterator object
-#  that we pass to the model.fit_generator. Let's set it up:
+#  that we pass to the model.fit. Let's set it up:
 # What should class_mode be set to here?
 #train_generator = train_datagen.flow_from_directory(train_folder, batch_size=batch_size, target_size=(dims,dims), shuffle=True, class_mode='?', color_mode='grayscale')
 #valid_generator = valid_datagen.flow_from_directory(valid_folder, batch_size=batch_size, target_size=(dims,dims), shuffle=True, class_mode='?', color_mode='grayscale')
@@ -158,10 +167,10 @@ steps = 500
 val_steps = 100
 
 # now let's train for 5 epochs (note that this is unrealistic demonstration of model training)
-history = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=5, 
-                              validation_data=valid_generator, validation_steps=val_steps)
+history = model.fit(train_generator, steps_per_epoch=steps, epochs=5, 
+                    validation_data=valid_generator, validation_steps=val_steps)
 
-# It should take approximately 5 minutes to train. Maybe you should take a break
+# It should not take long to train this model. Maybe a few minutes or less.
 
 
 # Now that training is complete. Let's plot the losses:
@@ -170,9 +179,6 @@ history = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=5,
 
 
 # first, we need to import matplotlib to enable plotting
-#%matplotlib notebook
-import matplotlib.pyplot as plt
-
 plt.figure(figsize=(6.0, 4.0));
 # Plot the losses
 plt.subplot(121)
@@ -205,19 +211,18 @@ plt.show()
 # In[ ]:
 
 
-# first we need to import MobileNet
-from keras.applications.mobilenet import MobileNet
-
 # here instantiate a MobileNet that is specific to our data (image size and number of classes) with randomized initial weights
-#model_mn = ?
+#model_mn = tf.keras.applications.mobilenet.MobileNet( ? )
 #<SOLUTION>
-model_mn = MobileNet(weights=None, input_shape=(dims,dims,1), classes=classes)
+model_mn = tf.keras.applications.mobilenet.MobileNet(weights=None, input_shape=(dims,dims,1), classes=classes)
 #</SOLUTION>
 
 # now let's train it
-model_mn.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e-5), metrics=["categorical_accuracy"])
-history_mn = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=5,
-                              validation_data=valid_generator, validation_steps=val_steps)
+model_mn.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
+history_mn = model_mn.fit(train_generator, steps_per_epoch=steps, epochs=5,
+                          validation_data=valid_generator, validation_steps=val_steps)
+
+# this model will take several minutes to train (a bit longer than the first one)
 
 
 # Now we can plot the losses compared to our first network:
@@ -251,26 +256,22 @@ plt.show()
 # 
 # #### To define VGG16 - https://arxiv.org/abs/1409.1556
 # <pre>
-# from keras.applications.vgg16 import VGG16
-# model = VGG16(weights=None, input_shape=(dims,dims,1), classes=classes)
+# model = tf.keras.applications.vgg16.VGG16(weights=None, input_shape=(dims,dims,1), classes=classes)
 # </pre>
 # #### To define InceptionV3 - http://arxiv.org/abs/1512.00567
 # <pre>
-# from keras.applications.inception_v3 import InceptionV3
-# model = InceptionV3(weights=None, input_shape=(dims,dims,1), classes=classes)
+# model = tf.keras.applications.inception_v3.InceptionV3(weights=None, input_shape=(dims,dims,1), classes=classes)
 # </pre>
 # #### To define DenseNet - https://arxiv.org/abs/1608.06993
 # <pre>
-# from keras.applications.densenet import DenseNet121
-# model = DenseNet121(weights=None, input_shape=(dims,dims,1), classes=classes)
+# model = tf.keras.applications.densenet.DenseNet121(weights=None, input_shape=(dims,dims,1), classes=classes)
 # </pre>
 # #### Used to train all of the above models
 # <pre>
-# model.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e-4), metrics=["categorical_accuracy"])
+# model.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
 # from keras.callbacks import ModelCheckpoint
 # model_checkpoint = ModelCheckpoint('weights.h5', monitor='loss', save_best_only=True)
-# history = model.fit_generator(train_generator, steps_per_epoch=steps, epochs=30, callbacks=[model_checkpoint],
-#                               validation_data=valid_generator, validation_steps=val_steps )
+# history = model.fit(train_generator, steps_per_epoch=steps, epochs=30, callbacks=[model_checkpoint], validation_data=valid_generator, validation_steps=val_steps )
 # </pre>
 # 
 # 
@@ -282,9 +283,9 @@ plt.show()
 
 
 # load in history files
-history_inceptionv3 = numpy.load('history_inceptionv3.npy')
-history_mobilenet = numpy.load('history_mobilenet.npy')
-history_vgg16 = numpy.load('history_vgg16.npy')
+history_inceptionv3 = numpy.load('/home/ImageModalityDetector/history_inceptionv3.npy',allow_pickle=True)
+history_mobilenet = numpy.load('/home/ImageModalityDetector/history_mobilenet.npy',allow_pickle=True)
+history_vgg16 = numpy.load('/home/ImageModalityDetector/history_vgg16.npy',allow_pickle=True)
 
 # let's plot them
 plt.figure(figsize=(6.0, 4.0));
@@ -319,9 +320,8 @@ plt.show()
 # In[ ]:
 
 
-from keras.applications.inception_v3 import InceptionV3
-model_i = InceptionV3(weights='weights_inceptionv3.h5', input_shape=(dims,dims,1), classes=classes)
-model_i.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e-4), metrics=["categorical_accuracy"])
+model_i = tf.keras.applications.inception_v3.InceptionV3(weights='/home/ImageModalityDetector/weights_inceptionv3.h5', input_shape=(dims,dims,1), classes=classes)
+model_i.compile(loss="categorical_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4), metrics=["categorical_accuracy"])
 
 
 # Now let's work on testing the model with some data
@@ -330,9 +330,9 @@ model_i.compile(loss="categorical_crossentropy", optimizer=optimizers.Adam(lr=1e
 
 
 # let's set up an ImageDataGenerator for the test data
-test_folder = os.path.join(os.getcwd(),'test')
-test_datagen = ImageDataGenerator(rescale=1./255)
-test_generator = test_datagen.flow_from_directory(valid_folder, batch_size=1, target_size=(dims,dims), class_mode='categorical', color_mode='grayscale')
+test_folder = '/home/ImageModalityDetector/test'
+test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+test_generator = test_datagen.flow_from_directory(test_folder, batch_size=1, target_size=(dims,dims), class_mode='categorical', color_mode='grayscale')
 
 
 # In[ ]:
@@ -367,3 +367,9 @@ print('The actual type was {}, the predicted type was {}'.format(actual_type,pre
 # 3. Try adding different types of augmentation, such as left-right and up-down flips. What about adding more extreme degrees of augmentation? Does this improve network performance?
 # 4. Try adding augmentation to the evaluation stage to see how the network performs with augmentation.
 # 5. Explore the other types of available Callback functions during model fitting. There are many useful predefined types of callbacks that you can use to get more information from your network during training. Read more about them here: https://keras.io/callbacks/
+
+# In[ ]:
+
+
+
+
