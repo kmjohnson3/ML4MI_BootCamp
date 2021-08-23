@@ -10,7 +10,6 @@ Bootcamp organizers:
 - Alan McMillan ( AMcmillan@uwhealth.org )
 - Jacob Johnson ( jmjohnson33@wisc.edu ) 
 - Kevin Johnson  ( kmjohnson3@wisc.edu )
-- Tyler Bradshaw  ( tbradshaw@wisc.edu )
 
 # System Requirements (Standalone)
 Code has been tested on a machine with a NVIDIA K80 (11gb of GPU ram). To run this you need:
@@ -35,13 +34,13 @@ conda install -c conda-forge --no-deps pydicom
 These have been adapted to the Google research supported Colab. This is a free cloud based enviroment supported by Google. You can click on the link in the source code or go to https://colab.research.google.com/ and open from github. For UW-Madison users, you need to have access to the ML4MI_BOOTCAMP_DATA Google Drive folder.
 
 # Examples:
-- FunctionFitting - Some very basic networks used for learning functions 
-- ImageReconstruction - Training of an neural network to reconstruct MRI images using 1D operations 
-- MaleFemaleRadiograph - Classify chest xrays as male or female
-- ImageSegmentation - Lung segmentation from CT data (need to download data yourself)
-- AgeRegression - Regression for Age 
-- ImageSynthesis - Image synthesis of brats data
+- FunctionFitting - Some very basic networks used for learning functions [link](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/FunctionFitting/FunctionFitter.ipynb)
+- ImageReconstruction - Training of an neural network to reconstruct MRI images using 1D operations [Keras version](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/ImageReconstruction/CoLab_AutoMap_Recon.ipynb)  [PyTorch version](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/ImageReconstruction/CoLab_AutoMap_Recon_Torch.ipynb)
+- MaleFemaleRadiograph - Classify chest xrays as male or female [link](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/MaleFemaleRadiograph/male_female_basic_example.ipynb)
+- ImageSegmentation - Lung segmentation from CT data [link](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/ImageSegmentation/Segmentation_StudentCopy.ipynb)
+- AgeRegression - Regression for Age [link](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/AgeRegressionChallenge/age_regression_competition.ipynb)
+- ImageSynthesis - Image synthesis of brats data [link](https://colab.research.google.com/github/kmjohnson3/ML4MI_Bootcamp/blob/master/ImageSynthesis/ImageTranslation.ipynb)
 
 # Note on commits:
-If you aim to push changes to this repository, please edit the jupyter notebooks and then run clear_and_convert_bash (in linux or WSL). This will convert the notebooks to python and clear the ouput.
+If you aim to push changes to this repository, please clear the output before requesting a pull. 
 
