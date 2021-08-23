@@ -6,7 +6,8 @@ All the excercises are written in Keras which is integrated into tensorflow. We 
 Keras Documentations:
     https://keras.io/
     
-Bootcamp organizers:
+Bootcamp contributors:
+-Tyler Bradshaw ( tbradshaw@wisc.edu ) 
 - Alan McMillan ( AMcmillan@uwhealth.org )
 - Jacob Johnson ( jmjohnson33@wisc.edu ) 
 - Kevin Johnson  ( kmjohnson3@wisc.edu )
